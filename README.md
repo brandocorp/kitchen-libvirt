@@ -13,9 +13,9 @@ A Test Kitchen Driver for Libvirt
 3. Build images.
 4. Add Libvirt configuration to the `driver` section of your `.kitchen.yml`
 
-    driver:
-      name: libvirt
-      uri: qemu:///session
+       driver:
+         name: libvirt
+         uri: qemu:///session
 
 5. Run `kitchen test`.
 
