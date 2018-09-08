@@ -1,5 +1,6 @@
-# -*- encoding: utf-8 -*-
-lib = File.expand_path('../lib', __FILE__)
+# frozen_string_literal: true
+
+lib = File.expand_path('lib', __dir__)
 $LOAD_PATH.unshift(lib) unless $LOAD_PATH.include?(lib)
 require 'kitchen/driver/libvirt_version.rb'
 
@@ -20,8 +21,8 @@ Gem::Specification.new do |gem|
 
   # gem.required_ruby_version = '>= 2.2.2'
 
+  gem.add_dependency 'fog-libvirt', '~> 0.5.0'
   gem.add_dependency 'test-kitchen', '~> 1.4', '>= 1.4.1'
-  gem.add_dependency 'fog-libvirt', '~> 0.5.0' 
 
   gem.add_development_dependency 'rspec',     '~> 3.2'
   gem.add_development_dependency 'simplecov', '~> 0.7'
