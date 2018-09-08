@@ -1,4 +1,4 @@
-# -*- encoding: utf-8 -*-
+# frozen_string_literal: true
 #
 # Author:: Brandon Raabe (<brandocorp@gmail.com>)
 #
@@ -22,20 +22,18 @@ require 'kitchen'
 require_relative 'libvirt_version'
 
 module Kitchen
-
   module Driver
     # Libvirt driver for Test Kitchen
     #
-    # @author Brandon Raabe <brandocorp@gmail.com>
+    # @author Brandon Raabe (<brandocorp@gmail.com>)
     class Libvirt < Kitchen::Driver::Base
-
       kitchen_driver_api_version 2
 
       plugin_version Kitchen::Driver::LIBVIRT_VERSION
 
       # The Libvirt connection URI
       default_config :uri, 'qemu:///session'
-      
+
       # The Libvirt connection username (optional)
       default_config :username, nil
 
@@ -60,7 +58,7 @@ module Kitchen
       # The base image format
       default_config :image_format, 'raw'
 
-      # The bridge device to use for the domain's network connection 
+      # The bridge device to use for the domain's network connection
       default_config :bridge_name, 'virbr0'
 
       # The name of the network the domain will join
@@ -70,51 +68,48 @@ module Kitchen
       default_config :domain_type, 'kvm'
 
       # Additional volumes to create and attach
-      default_config :extra_disks, []
-      
+      default_config :extra_volumes, []
+
       # Create the target instance
       def create(state)
         info("Creating instance #{instance.name}")
-
         return if state[:server_id]
 
-        domain = create_server
-        state[:server_id] = domain.id
-        domain.start
-
-        wait_for_ip_address(domain)
-        state[:hostname] = domain.public_ip_address
+        domain = create_domain
         instance.transport.connection(state).wait_until_ready
-
+        state[:server_id] = domain.id
+        state[:hostname] = domain.public_ip_address
         info("Libvirt instance #{domain.name} created.")
-        domain
       end
 
       # Destroy the target instance
       def destroy(state)
+        info("Creating instance #{instance.name}")
         return if state[:server_id].nil?
-        
+        instance.transport.connection(state).close
         domain = load_domain(state[:server_id])
-
-        if domain.nil?
-          debug("Unable to find domain #{state[:server_id]}")
-        else
-          instance.transport.connection(state).close
-          domain.halt if domain.active       
-          volume_cleanup(domain)
-          domain.destroy
-        end
-
+        destroy_domain(domain) unless domain.nil?
+        info("Libvirt instance #{state[:server_id]} destroyed.")
         state.delete(:server_id)
         state.delete(:hostname)
       end
 
-      # Cleanup a domain's volumes
-      def volume_cleanup(domain)
-        domain.volumes.map(&:destroy)
-        # domain.volumes.each do |volume|
-        #   volume.destroy if volume.key
-        # end
+      private
+
+      # The libvirt client
+      def client
+        @client ||= Fog::Compute.new(
+          provider: 'libvirt',
+          libvirt_uri: config[:uri],
+          libvirt_ip_command: default_ip_command
+        )
+      end
+
+      # The command string to use for finding the domain IP address
+      #
+      # @return String The command string
+      def default_ip_command
+        %q( awk "/$mac/ {print \$1}" /proc/net/arp )
       end
 
       # Returns the default image name for the configured platform
@@ -132,31 +127,32 @@ module Kitchen
         "#{instance.platform.name}-#{Time.now.to_i}"
       end
 
-      private
-
-      # The libvirt 
-      def client
-        @client ||= Fog::Compute.new(
-          provider: 'libvirt',
-          libvirt_uri: config[:uri],
-          libvirt_ip_command: default_ip_command
-        )
+      # Create the domain, and all its dependencies
+      #
+      # @return Fog::Compute::Libvirt::Server The created domain
+      def create_domain
+        debug("Creating domain #{domain_name}")
+        debug("Using options: #{domain_options}")
+        domain = client.servers.create(domain_options)
+        prepare_domain(domain)
+        domain
       end
 
-      # The command string to use for finding the domain IP address
-      #
-      # @return String The command string
-      def default_ip_command
-        %q( awk "/$mac/ {print \$1}" /proc/net/arp )
+      # Prepares the domain for SSH connections
+      def prepare_domain(domain)
+        domain.start unless domain.active
+        wait_for_ip_address(domain)
       end
 
       # Create the domain, and all its dependencies
       #
       # @return Fog::Compute::Libvirt::Server The created domain
-      def create_server
-        debug("Creating domain #{domain_name}")
-        debug("Using options: #{domain_options}")      
-        client.servers.create(domain_options)
+      def destroy_domain(domain)
+        debug("Destroying domain #{domain.id}")
+        domain.halt if domain.active
+        debug("Removing volumes for domain #{domain.id}")
+        volume_cleanup(domain)
+        domain.destroy
       end
 
       # Create a new volume from the source image
@@ -167,51 +163,73 @@ module Kitchen
         debug("Cloning volume from #{source}")
         source_image = client.volumes.get(source)
         source_image.clone_volume(target)
-        client.volumes.all.find {|vol| vol.name == target }
+        client.volumes.all.find { |vol| vol.name == target }
+      end
+
+      # Create the extra disks
+      def create_volumes(volume_definitions)
+        volume_definitions.each { |volume| client.volumes.create(volume) }
+      end
+
+      # Cleanup a domain's volumes
+      def volume_cleanup(domain)
+        domain.volumes.each do |volume|
+          debug("Removing volumes #{volume.key}")
+          volume.destroy if volume.key
+        end
       end
 
       # Create an array of all virtual disks for the domain
       #
-      # @return Array<Hash> the domain volumes
+      # @return Array<Fog::Compute::Libvirt::Volume> the domain volumes
       def domain_volumes
-        # Clone our root disk from our base image
+        # Use the domain name as our volume base name.
         base_name = domain_name
-        vols = [clone_volume(default_image, "#{base_name}-root")]
-        
-        # Iterate over the extra disks and create them
-        config[:extra_disks].each_with_index do |data, index|
-          disk_id = (index + 1).to_s.rjust(2, "0")
-          disk = {
-            name: "#{base_name}-extra-#{disk_id}",
-            format_type: data[:format_type],
-            pool_name: data[:pool_name],
-            capacity: data[:capacity]
-          }
-          vols << client.volumes.create(disk)
+
+        # Clone our root volume from our base image.
+        root_volume = clone_volume(default_image, "#{base_name}-root")
+
+        # Return the array of created volumes
+        [root_volume].concat(
+          create_volumes(
+            extra_volumes(base_name)
+          )
+        )
+      end
+
+      # Create a config structure for each additional volume.
+      #
+      # @return Array<Hash> the volume configuration array
+      def extra_volumes(base_name)
+        configs = []
+
+        config[:extra_volumes].each_with_index do |data, index|
+          disk_id = (index + 1).to_s.rjust(2, '0')
+          data[:name] = "#{base_name}-extra-#{disk_id}"
+          configs << data
         end
 
-        # Return all the created disks
-        vols
+        configs
       end
 
       # Prepare the options passed to create the domain
       #
-      # @return Hash The domain configuration 
+      # @return Hash The domain configuration
       def domain_options
         @domain_options ||= {
-          :name => domain_name, 
-          :persistent => config[:persistent], 
-          :cpus => domain_cpus,
-          :memory_size => domain_memory, 
-          :os_type => "hvm", 
-          :arch => config[:arch], 
-          :domain_type => config[:domain_type], 
-          :nics => [{
+          name: domain_name,
+          persistent: config[:persistent],
+          cpus: domain_cpus,
+          memory_size: domain_memory,
+          os_type: 'hvm',
+          arch: config[:arch],
+          domain_type: config[:domain_type],
+          nics: [{
             type: 'network',
             network: config[:network_name],
             bridge: config[:network_bridge_name]
           }],
-          :volumes => domain_volumes
+          volumes: domain_volumes
         }
       end
 
@@ -242,29 +260,28 @@ module Kitchen
       def domain_name
         @domain_name ||= default_name
       end
-      
+
       # Find and return a domain by it's id
-      # 
-      # @return Fog::Compute::Libvirt::Volume The created volume
+      #
+      # @return Fog::Compute::Libvirt::Domain The loaded domain
       def load_domain(domain_id)
         client.servers.get(domain_id)
       rescue ::Libvirt::RetrieveError
         debug("Domain with id #{domain_id} was not found.")
-        return nil
+        nil
       end
 
-      def wait_for_ip_address(domain, timeout=300)
-        debug("Waiting for domain network to assign an IP address")
+      # Wait for the domain to receive its IP address
+      def wait_for_ip_address(domain, timeout = 300)
+        debug('Waiting for domain network to assign an IP address')
         loop do
           break if timeout <= 0
-          
-          ip = domain.public_ip_address
 
-          if ip 
+          if domain.public_ip_address
             debug("IP address: #{domain.public_ip_address}")
             break
           else
-            debug("IP address not found...")
+            debug('IP address not found...')
             timeout -= 5
             sleep 5
           end
