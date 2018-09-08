@@ -37,37 +37,39 @@ describe Kitchen::Driver::Libvirt do
   let(:image) do
     double("source_image",
       path: '/var/lib/images/image.img',
-      pool_name: 'default', 
+      pool_name: 'default',
       format_type: 'raw'
     )
   end
 
-  let(:volume) do 
-    { 
+  let(:volume) do
+    double(
+      'libvirt volume',
       path: '/var/lib/images/volume.img',
-      pool_name: 'default', 
-      format_type: 'raw' 
-    }
+      pool_name: 'default',
+      format_type: 'raw',
+      destroy: true
+    )
   end
 
   let(:nic) do
-    { 
-      type: 'network', 
-      network: 'default' 
+    {
+      type: 'network',
+      network: 'default'
     }
   end
-  
+
   let(:domain_options) do
     {
-      name: "default-testos-99-0123456789", 
-      persistent: true, 
+      name: "default-testos-99-0123456789",
+      persistent: true,
       cpus: 1,
-      memory_size: 512, 
-      os_type: 'hvm', 
-      arch: 'x86_64', 
+      memory_size: 512,
+      os_type: 'hvm',
+      arch: 'x86_64',
       domain_type: 'kvm',
       nics: [nic],
-      volumes: [volume] 
+      volumes: [volume]
     }
   end
 
@@ -81,18 +83,20 @@ describe Kitchen::Driver::Libvirt do
     double("Fog::Compute")
   end
 
-  let(:domain) do 
+  let(:domain) do
     double(
-      "libvirt domain", 
-      id: id, 
+      'libvirt domain',
+      id: id,
       name: "default-testos-99-0123456789",
       public_ip_address: '1.2.3.4',
       start: true,
       volumes: [volume],
       nics: [nic],
+      halt: true,
+      active: true
     )
   end
-  
+
   let(:instance) do
     instance_double(
       Kitchen::Instance,
@@ -110,7 +114,7 @@ describe Kitchen::Driver::Libvirt do
     allow(driver).to receive(:instance).and_return(instance)
     allow(driver).to receive(:client).and_return(client)
     allow(client).to receive_message_chain("servers.create").and_return(domain)
-    allow(driver).to receive(:create_volume).and_return(volume)
+    allow(driver).to receive(:domain_volumes).and_return([volume])
   end
 
   it "driver api_version is 2" do

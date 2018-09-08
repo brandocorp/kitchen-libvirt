@@ -21,6 +21,6 @@ module Kitchen
   module Driver
 
     # Version string for Libvirt Test Kitchen driver
-    LIBVIRT_VERSION = "0.1.0"
+    LIBVIRT_VERSION = "0.2.0"
   end
 end

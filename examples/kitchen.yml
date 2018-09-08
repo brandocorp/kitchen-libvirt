@@ -15,5 +15,11 @@ transport:
 
 suites:
   - name: default
+    driver:
+      extra_disks:
+        - format_type: raw
+          pool_name: 'default'
+          capacity: 10G 
     run_list:
     attributes:
+    

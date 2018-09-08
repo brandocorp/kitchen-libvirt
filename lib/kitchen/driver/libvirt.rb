@@ -68,6 +68,9 @@ module Kitchen
 
       # The type of domain to launch
       default_config :domain_type, 'kvm'
+
+      # Additional volumes to create and attach
+      default_config :extra_disks, []
       
       # Create the target instance
       def create(state)
@@ -92,16 +95,26 @@ module Kitchen
         return if state[:server_id].nil?
         
         domain = load_domain(state[:server_id])
-  
+
         if domain.nil?
           debug("Unable to find domain #{state[:server_id]}")
         else
           instance.transport.connection(state).close
+          domain.halt if domain.active       
+          volume_cleanup(domain)
           domain.destroy
         end
 
         state.delete(:server_id)
         state.delete(:hostname)
+      end
+
+      # Cleanup a domain's volumes
+      def volume_cleanup(domain)
+        domain.volumes.map(&:destroy)
+        # domain.volumes.each do |volume|
+        #   volume.destroy if volume.key
+        # end
       end
 
       # Returns the default image name for the configured platform
@@ -149,19 +162,43 @@ module Kitchen
       # Create a new volume from the source image
       #
       # @return Fog::Compute::Libvirt::Volume The created volume
-      def create_volume(volume_name)
-        debug("Creating Libvirt volume #{volume_name}")
-        debug("Cloning volume from #{default_image}")
-        source_image = client.volumes.get(default_image)
-        source_image.clone_volume(volume_name)
-        client.volumes.all.find {|vol| vol.name == volume_name }
+      def clone_volume(source, target)
+        debug("Creating Libvirt volume #{target}")
+        debug("Cloning volume from #{source}")
+        source_image = client.volumes.get(source)
+        source_image.clone_volume(target)
+        client.volumes.all.find {|vol| vol.name == target }
+      end
+
+      # Create an array of all virtual disks for the domain
+      #
+      # @return Array<Hash> the domain volumes
+      def domain_volumes
+        # Clone our root disk from our base image
+        base_name = domain_name
+        vols = [clone_volume(default_image, "#{base_name}-root")]
+        
+        # Iterate over the extra disks and create them
+        config[:extra_disks].each_with_index do |data, index|
+          disk_id = (index + 1).to_s.rjust(2, "0")
+          disk = {
+            name: "#{base_name}-extra-#{disk_id}",
+            format_type: data[:format_type],
+            pool_name: data[:pool_name],
+            capacity: data[:capacity]
+          }
+          vols << client.volumes.create(disk)
+        end
+
+        # Return all the created disks
+        vols
       end
 
       # Prepare the options passed to create the domain
       #
       # @return Hash The domain configuration 
       def domain_options
-        {
+        @domain_options ||= {
           :name => domain_name, 
           :persistent => config[:persistent], 
           :cpus => domain_cpus,
@@ -174,7 +211,7 @@ module Kitchen
             network: config[:network_name],
             bridge: config[:network_bridge_name]
           }],
-          :volumes => [create_volume(domain_name)]
+          :volumes => domain_volumes
         }
       end
 
@@ -203,7 +240,7 @@ module Kitchen
       #
       # @return String The domain's name
       def domain_name
-        default_name
+        @domain_name ||= default_name
       end
       
       # Find and return a domain by it's id
