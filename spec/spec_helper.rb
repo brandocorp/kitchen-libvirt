@@ -1,4 +1,5 @@
-# -*- encoding: utf-8 -*-
+# frozen_string_literal: true
+
 #
 # Author:: Brandon Raabe (<brandocorp@gmail.com>)
 #
@@ -16,20 +17,20 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-if ENV["CODECLIMATE_REPO_TOKEN"]
-  require "codeclimate-test-reporter"
+if ENV['CODECLIMATE_REPO_TOKEN']
+  require 'codeclimate-test-reporter'
   CodeClimate::TestReporter.start
-elsif ENV["COVERAGE"]
-  require "simplecov"
-  SimpleCov.profiles.define "gem" do
-    command_name "Specs"
+elsif ENV['COVERAGE']
+  require 'simplecov'
+  SimpleCov.profiles.define 'gem' do
+    command_name 'Specs'
 
-    add_filter ".gem/"
-    add_filter "/spec/"
+    add_filter '.gem/'
+    add_filter '/spec/'
 
-    add_group "Libraries", "/lib/"
+    add_group 'Libraries', '/lib/'
   end
-  SimpleCov.start "gem"
+  SimpleCov.start 'gem'
 end
 
 RSpec.configure do |config|
@@ -46,17 +47,14 @@ RSpec.configure do |config|
   config.disable_monkey_patching!
   config.warnings = true
 
-  if config.files_to_run.one?
-    config.default_formatter = "doc"
-  end
+  config.default_formatter = 'doc' if config.files_to_run.one?
 
   config.order = :random
 
   Kernel.srand config.seed
 
   config.expose_dsl_globally = true
-
 end
 
-require "fog/libvirt"
-require "support/fog"
+require 'fog/libvirt'
+require 'support/fog'

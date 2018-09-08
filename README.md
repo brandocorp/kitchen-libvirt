@@ -114,10 +114,11 @@ For standard platforms we automatically provide the SSH username, but when speci
 
 A list of block device mappings for the machine.  An example of all available keys looks like:
 
-    devices:
-    - type: disk
-      format: qcow2
-      volume_size: 20
+    volumes:
+    - format: raw
+      pool: default
+      size: 20G
+      backing_volume: /var/lib/libvirt/golden.img
 
 ## Example
 
@@ -129,18 +130,31 @@ to override default configuration.
       name: libvirt
       uri: qemu:///session
     transport:
+      username: vagrant
       ssh_key: ~/.vagrant.d/insecure_private_key
 
     platforms:
       - name: ubuntu-16.04
       - name: centos-7
         driver:
-          vcpu: 2
+          cpus: 2
           memory: 2048
         transport:
           username: centos
 
     suites:
+      - name: default
+        driver:
+          volumes:
+            - format: qcow2
+              pool: default
+              size: 10G
+            - format: qcow2
+              pool: default
+              size: 10G
+        run_list:
+        attributes:
+
 
 ## Development
 
