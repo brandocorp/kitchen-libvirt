@@ -1,0 +1,90 @@
+{
+    "builders": [
+      {
+        "accelerator": "kvm",
+        "boot_command": [
+          "<up><wait><tab>",
+          " text ks=http://{{ .HTTPIP }}:{{ .HTTPPort }}/{{user `ks_path`}}",
+          "<enter><wait>"
+        ],
+        "boot_wait": "10s",
+        "disk_size": "{{user `disk_size`}}",
+        "headless": "{{ user `headless` }}",
+        "http_directory": "http/centos",
+        "iso_checksum": "{{user `iso_checksum`}}",
+        "iso_checksum_type": "{{user `iso_checksum_type`}}",
+        "iso_url": "{{user `mirror`}}/{{user `mirror_directory`}}/{{user `iso_name`}}",
+        "output_directory": "{{ user `build_output` }}/{{user `box_basename`}}",
+        "shutdown_command": "echo 'vagrant' | sudo -S /sbin/halt -h -p",
+        "ssh_password": "vagrant",
+        "ssh_port": 22,
+        "ssh_username": "vagrant",
+        "ssh_wait_timeout": "10000s",
+        "type": "qemu",
+        "vm_name": "{{ user `template` }}",
+        "qemuargs": [
+          [
+            "-m",
+            "{{ user `memory` }}M"
+          ],
+          [
+            "-smp",
+            "{{ user `cpus` }}"
+          ]
+        ]
+      }
+    ],
+    "post-processors": [
+      {
+        "output": "{{ user `build_output` }}/{{user `box_basename` }}-manifest.json",
+        "strip_path": true,
+        "type": "manifest"
+      }
+    ],
+    "provisioners": [
+      {
+        "environment_vars": [
+          "HOME_DIR=/home/vagrant",
+          "http_proxy={{user `http_proxy`}}",
+          "https_proxy={{user `https_proxy`}}",
+          "no_proxy={{user `no_proxy`}}"
+        ],
+        "execute_command": "echo 'vagrant' | {{.Vars}} sudo -S -E sh -eux '{{.Path}}'",
+        "expect_disconnect": true,
+        "scripts": [
+          "scripts/centos/update.sh",
+          "scripts/_common/sshd.sh",
+          "scripts/centos/networking.sh",
+          "scripts/_common/vagrant.sh",
+          "scripts/centos/cleanup.sh",
+          "scripts/_common/minimize.sh"
+        ],
+        "type": "shell"
+      }
+    ],
+    "variables": {
+      "box_basename": "centos-7",
+      "build_timestamp": "{{isotime \"20060102150405\"}}",
+      "cpus": "1",
+      "disk_interface": "virtio",
+      "disk_size": "65536",
+      "git_revision": "__unknown_git_revision__",
+      "headless": "",
+      "http_proxy": "{{env `http_proxy`}}",
+      "https_proxy": "{{env `https_proxy`}}",
+      "iso_checksum": "714acc0aefb32b7d51b515e25546835e55a90da9fb00417fbee2d03a62801efd",
+      "iso_checksum_type": "sha256",
+      "iso_name": "CentOS-7-x86_64-Minimal-1804.iso",
+      "memory": "1024",
+      "mirror": "http://mirrors.ocf.berkeley.edu",
+      "mirror_directory": "centos/7/isos/x86_64",
+      "name": "centos-7",
+      "net_device": "virtio-net",
+      "no_proxy": "{{env `no_proxy`}}",
+      "build_output": "{{ env `PACKER_CACHE_DIR` }}/builds",
+      "ks_path": "ks.cfg",
+      "template": "kitchen-centos-7",
+      "version": "TIMESTAMP"
+    }
+  }
+  
