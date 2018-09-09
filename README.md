@@ -9,7 +9,7 @@ A Test Kitchen Driver for Libvirt
 ## Quick Start
 
 1. Install [ChefDK](https://downloads.chef.io/chefdk).
-2. Install [libvirt](docs/installing_libvirt.md).
+2. Install [libvirt](docs/libvirt_install.md).
 3. Build the [images](images/README.md).
 4. Add Libvirt configuration to the `driver` section of your `.kitchen.yml`
   1. Existing configuration
