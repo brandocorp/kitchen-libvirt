@@ -76,15 +76,17 @@ module Kitchen
         return if state[:server_id]
 
         domain = create_domain
-        instance.transport.connection(state).wait_until_ready
         state[:server_id] = domain.id
         state[:hostname] = domain.public_ip_address
+
+        instance.transport.connection(state).wait_until_ready
+
         info("Libvirt instance #{domain.name} created.")
       end
 
       # Destroy the target instance
       def destroy(state)
-        info("Creating instance #{instance.name}")
+        info("Destroying instance #{instance.name}")
         return if state[:server_id].nil?
         instance.transport.connection(state).close
         domain = load_domain(state[:server_id])
