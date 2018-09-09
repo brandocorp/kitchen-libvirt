@@ -9,6 +9,7 @@ group :dev do
   gem 'maruku'
   gem 'pronto'
   gem 'pronto-flay', require: false
+  gem 'pronto-reek', require: false
   gem 'pronto-rubocop', require: false
   gem 'rubocop'
   gem 'yard'
