@@ -1,4 +1,4 @@
-# Kitchen Libvirt 
+# Kitchen Libvirt
 
 A Test Kitchen Driver for Libvirt
 
@@ -9,13 +9,18 @@ A Test Kitchen Driver for Libvirt
 ## Quick Start
 
 1. Install [ChefDK](https://downloads.chef.io/chefdk).
-2. Install libvirt.
-3. Build images.
+2. Install [libvirt](docs/installing_libvirt.md).
+3. Build the [images](images/README.md).
 4. Add Libvirt configuration to the `driver` section of your `.kitchen.yml`
+  1. Existing configuration
 
-       driver:
-         name: libvirt
-         uri: qemu:///session
+          driver:
+            name: libvirt
+            uri: qemu:///session
+
+  2. New configuration
+
+          kitchen init --driver libvirt
 
 5. Run `kitchen test`.
 
@@ -25,7 +30,7 @@ A Test Kitchen Driver for Libvirt
 
 ## Configuration
 
-### `uri` 
+### `uri`
 
 The Libvirt connection URI
 
@@ -61,7 +66,7 @@ Determines ephemerality of the instance
 
     Default: true
 
-### `bridge_name` 
+### `bridge_name`
 
 The bridge device to use for networking.
 
@@ -88,7 +93,7 @@ blank, and specifying a standard platform name.
     platforms:
       - name: ubuntu-14.04
 
-You may leave versions off, specify partial versions, and you may specify architecture to distinguish 32- and 64-bit. 
+You may leave versions off, specify partial versions, and you may specify architecture to distinguish 32- and 64-bit.
 
 ##### Examples
 
