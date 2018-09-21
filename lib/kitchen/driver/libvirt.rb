@@ -163,7 +163,14 @@ module Kitchen
       def clone_volume(source, target)
         debug("Creating Libvirt volume #{target}")
         debug("Cloning volume from #{source}")
+
+        # Attempt to locate the target or source volume
         source_image = client.volumes.get(source)
+        if source_image.name =~ /^fog-\d+/
+          error("Could not find target image: #{source}.")
+        end
+
+        # Clone the source volume
         source_image.clone_volume(target)
         client.volumes.all.find { |vol| vol.name == target }
       end
